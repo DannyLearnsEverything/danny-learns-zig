@@ -8,51 +8,64 @@ pub fn main() !void {
     const input = try std.fs.cwd().readFileAlloc(alloc, "input.txt", 1024 * 1024);
     defer alloc.free(input);
 
-    var head: usize = 0;
-    head = indexOfFirstDigit(input, head);
-}
+    var totalAreaAllBoxes: u32 = 0;
+    var totalRibbonLength: u32 = 0;
 
-fn isDigit(c: u8) bool {
-    return c >= '0' and c <= '9';
-}
+    var dimensionIndex: u2 = 0;
+    var dimensions = [_]u16{0} ** 3;
+    for (input) |byte| {
+        switch (byte) {
+            '0'...'9' => {
+                dimensions[dimensionIndex] *= 10;
+                dimensions[dimensionIndex] += (byte - '0');
+            },
+            'x' => {
+                dimensionIndex += 1;
+            },
+            '\n' => {
+                // Newline indicates we're done with the sequence
+                const length, const width, const height = dimensions;
 
-fn indexOfFirstDigit(input: []const u8, start: usize) usize {
-    var i: usize = start;
-    while (!isDigit(input[i])) {
-        i += 1;
-    }
-    return i;
-}
+                // Part 1
+                const topArea = length * width;
+                const frontArea = height * width;
+                const rightArea = height * length;
+                const minSideArea = min3(topArea, frontArea, rightArea);
+                const totalBoxArea = 2 * (topArea + frontArea + rightArea) + minSideArea;
+                totalAreaAllBoxes += totalBoxArea;
 
-test "indexOfFirstDigitAfter" {
-    try std.testing.expectEqual(0, indexOfFirstDigit("123", 0));
-    try std.testing.expectEqual(1, indexOfFirstDigit("a123", 0));
-    try std.testing.expectEqual(2, indexOfFirstDigit("aa123", 0));
-    try std.testing.expectEqual(1, indexOfFirstDigit("1123", 1));
-    try std.testing.expectEqual(2, indexOfFirstDigit("1a123", 1));
-    try std.testing.expectEqual(3, indexOfFirstDigit("1aa123", 1));
-}
+                // Part 2
+                const topPerimeter = 2 * (length + width);
+                const frontPerimeter = 2 * (height + width);
+                const rightPerimeter = 2 * (height + length);
+                const minPerimeter = min3(topPerimeter, frontPerimeter, rightPerimeter);
+                const volume = length * width * height;
+                const totalBoxRibbonLength = minPerimeter + volume;
+                totalRibbonLength += totalBoxRibbonLength;
 
-fn charToDigit(c: u8) i8 {
-    return @intCast(c - '0');
-}
-
-fn parseInt(input: []const u8, start: usize, end: usize) struct { i32, usize } {
-    var head = indexOfFirstDigit(input, start);
-    var value: i32 = 0;
-    while (true) {
-        const c = input[head];
-        if (!isDigit(c)) {
-            return .{ value, head };
+                // Reset for the next line
+                dimensionIndex = 0;
+                dimensions = [_]u16{0} ** 3;
+            },
+            else => {
+                try out("Unhandled byte {x} as ascii:{c}\n", .{ byte, byte });
+                std.posix.exit(0);
+            },
         }
-        const digit = charToDigit(input[head]);
-        value = 10 * value + digit;
-        head += 1;
     }
 
-    return .{ value, head };
+    try out("Part 1: {d}\n", .{totalAreaAllBoxes});
+    try out("Part 2: {d}\n", .{totalRibbonLength});
 }
 
-test "parseInt" {
-    try std.testing.expectEqualDeep(.{ 123, 4 }, parseInt("123", 0));
+fn min3(a: u16, b: u16, c: u16) u16 {
+    return @min(a, @min(b, c));
+}
+
+fn out(comptime fmt: []const u8, args: anytype) !void {
+    var stdout_buffer: [1024 * 1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout = &stdout_writer.interface;
+    try stdout.print(fmt, args);
+    try stdout.flush();
 }
